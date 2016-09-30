@@ -1,0 +1,5 @@
+visible = true
+origin = (0,0)
+z_position = 1000
+alignment = default
+dimensions = screen_size

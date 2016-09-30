@@ -1,0 +1,110 @@
+#pragma once
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <string>
+#include <vector>
+#include "gui_component.h"
+using namespace std;
+
+namespace gui {
+
+// describes an input menu with selectable options
+// note: dimensions of the menu must be specified manually
+// the menu does not resize itself if it doesn't have enough rows
+//
+// how to use:
+// 1. setup dimensions/origin/z_position. commit attributes.
+// 2. setup menu colors for focused/blurred -- set_menu_color()
+// 3. [optional] set a description if desired -- set_description()
+// 4. add menu choices -- add_option()
+// 5. register gui component and register input component
+// 6. wait_for_decision() or wait_for_key()
+class input_menu : public gui_component, public input_component {
+public:
+
+	// constructor and destructor
+	input_menu();
+	virtual ~input_menu();
+
+	// input mode options
+	// modal input menus cannot be tabbed away from (default: non modal)
+	void           set_modal(bool status);
+	bool           is_modal() const;
+
+	// setup title for the menu
+	void           set_description(const string& desc, uint32_t max_lines);
+	string         get_description() const;
+
+	// menu appearance
+	void           set_menu_color(const color_t& focus_color, const color_t& blur_color);
+	void           set_option_highlight_color(const color_t& color);
+	void           set_scrollbar_color(const color_t& bar_color, const color_t& position_color);
+
+	// setup options in the menu
+	void           clear_options();
+	void           add_option(const string& option);
+	void           set_option(int choice, const string& option);
+
+	uint32_t       get_num_options() const;
+	string         get_option(int choice) const;
+	vector<string> get_all_options() const;
+
+	// selection control
+	void           set_current_selection(int choice);
+	string         get_current_selection_string() const;
+	int            get_current_selection() const;
+
+	// if user has made a selection before this function is called, the selection
+	// is returned. otherwise, block until user selects a menu option using the
+	// enter key. set timeout_ms to:
+	//
+	// <0       : blocks until completion.
+	// otherwise: waits for the specified number of milliseconds.
+	//            waiting 0 milliseconds will always timeout.
+	// default  : -1 (blocks)
+	//
+	// returns  : -1 on timeout, otherwise the choice picked.
+	int            wait_for_decision(int timeout_ms=-1);
+
+	// this function provides a generalization of the wait_for_decision() function.
+	// if user presses a key before the function is called, the key is returned.
+	// otherwise, block until user hits a key while over a specific menu option.
+	// timeout_ms is the same as wait_for_decision().
+	pair<int, keystroke> wait_for_key(int timeout_ms=-1);
+
+	// functions overriden from the gui component class
+	virtual void   commit_all();
+	virtual void   render();
+
+	// required functions from the input component class
+	virtual void   process_keypress(const keystroke& key);
+	virtual void   on_focus();
+	virtual void   on_blur();
+
+private:
+
+	// disable copies
+	input_menu(const input_menu& other);
+	input_menu& operator=(const input_menu& other);
+
+	mutable mutex              menu_lock;
+	mutable condition_variable menu_cond;
+	atomic_bool                modal;
+	bool                       has_focus;
+	color_t                    focus_color;
+	color_t                    blur_color;
+	color_t                    scrollbar_color;
+	color_t                    scrollbar_position_color;
+	string                     description;
+	uint32_t                   desc_lines;
+	color_t                    option_color;
+	int                        choice;
+	atomic_bool                decision_made;
+	keystroke                  decision_keystroke;
+	int                        view_range_top;
+	vector<string>             options;
+
+	void set_current_selection_unsafe(int choice);
+};
+};
